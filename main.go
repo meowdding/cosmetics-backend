@@ -74,8 +74,16 @@ func (authenticated AuthenticatedRequestHandler) handle(res http.ResponseWriter,
 }
 
 func create(handlers RequestRoute) func(http.ResponseWriter, *http.Request) {
+	return createSave("", handlers)
+}
+
+func createSave(path string, handlers RequestRoute) func(http.ResponseWriter, *http.Request) {
 	setDefaults(&handlers)
 	return func(res http.ResponseWriter, req *http.Request) {
+		if len(path) != 0 && req.URL.Path != path {
+			res.WriteHeader(http.StatusNotFound)
+			return
+		}
 		switch req.Method {
 		case "GET":
 			handlers.Get.handle(res, req)
@@ -95,8 +103,26 @@ func create(handlers RequestRoute) func(http.ResponseWriter, *http.Request) {
 
 func main() {
 	http.HandleFunc("/cosmetics", create(RequestRoute{
-		Put:   authenticated(routes.CreateCosmetic),
-		Patch: authenticated(routes.UpdateCosmetic),
+		Post:   authenticated(routes.CreateCosmetic),
+		Put:    authenticated(routes.UpdateCosmetic),
+		Delete: authenticated(routes.DeleteCosmetic),
+	}))
+	http.HandleFunc("/cosmetics/ids", create(RequestRoute{
+		Get: public(routes.ListCosmeticIds),
+	}))
+	http.HandleFunc("/", createSave("/", RequestRoute{
+		Get: public(routes.GetEntries),
+	}))
+	http.HandleFunc("/players/{uuid}", create(RequestRoute{
+		Get:    public(routes.GetPlayerData),
+		Delete: authenticated(routes.DeletePlayer),
+	}))
+	http.HandleFunc("/players/{uuid}/data", create(RequestRoute{
+		Post: public(routes.UpdatePlayerCustomData),
+	}))
+	http.HandleFunc("/players/{uuid}/cosmetics/{cosmetic_id}", create(RequestRoute{
+		Post:   public(routes.AddPlayerCosmetic),
+		Delete: public(routes.RemovePlayerCosmetic),
 	}))
 
 	fmt.Printf("Listening on 0.0.0.0:%s\n", routeContext.Config.Port)

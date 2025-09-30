@@ -1,0 +1,89 @@
+package routes
+
+import (
+	"cosmetics/routes/utils"
+	"cosmetics/util"
+	"encoding/json"
+	"io"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+)
+
+const cosmeticRequest = `
+	select data from cosmetics
+`
+
+const playerRequest = `
+	select player_id as player, player_data as data, cosmetics FROM players_with_cosmetics
+`
+
+type PlayerType struct {
+	Player    string                 `json:"uuid"`
+	Data      map[string]interface{} `json:"extra_data"`
+	Cosmetics []string               `json:"cosmetics"`
+}
+
+type Response struct {
+	Players   []PlayerType  `json:"players"`
+	Cosmetics []interface{} `json:"cosmetics"`
+}
+
+var cache = ""
+var lastCreated time.Time
+
+func GetEntries(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+	if len(cache) != 0 && time.Now().Sub(lastCreated) < time.Second*5 {
+		res.Header().Set("Content-Type", "application/json")
+		res.Header().Set("Cache-Control", "max-age=300")
+		res.Header().Set("Age", strconv.Itoa(int(time.Now().Sub(lastCreated)/time.Second)))
+		_, _ = io.WriteString(res, cache)
+		return
+	}
+
+	cosmeticResult, err := ctx.Pool.Query(ctx.Context, cosmeticRequest)
+	if err != nil {
+		util.PrintData(err)
+		util.PrintData(cosmeticResult)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer cosmeticResult.Close()
+
+	playerResult, err := ctx.Pool.Query(ctx.Context, playerRequest)
+	if err != nil {
+		util.PrintData(err)
+		util.PrintData(playerResult)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer playerResult.Close()
+
+	var result = Response{}
+	for cosmeticResult.Next() {
+		var cosmetic = make(map[string]interface{})
+		err := cosmeticResult.Scan(&cosmetic)
+		if err != nil {
+			continue
+		}
+		result.Cosmetics = append(result.Cosmetics, cosmetic)
+	}
+
+	list, err := pgx.CollectRows(playerResult, pgx.RowToStructByPos[PlayerType])
+
+	result.Players = list
+
+	tempCache, err := json.Marshal(result)
+	if err != nil {
+		util.PrintData(err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	cache = string(tempCache)
+	lastCreated = time.Now()
+	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("Cache-Control", "max-age=300")
+	_, _ = io.WriteString(res, cache)
+}
