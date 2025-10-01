@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"cosmetics/routes/utils"
-	"cosmetics/util"
+	"cosmetics/internal"
+	"cosmetics/utils"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -34,7 +34,7 @@ type Response struct {
 var cache = ""
 var lastCreated time.Time
 
-func GetEntries(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func GetEntries(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	if len(cache) != 0 && time.Now().Sub(lastCreated) < time.Second*5 {
 		res.Header().Set("Content-Type", "application/json")
 		res.Header().Set("Cache-Control", "max-age=300")
@@ -45,8 +45,8 @@ func GetEntries(ctx utils.RouteContext, res http.ResponseWriter, req *http.Reque
 
 	cosmeticResult, err := ctx.Pool.Query(ctx.Context, cosmeticRequest)
 	if err != nil {
-		util.PrintData(err)
-		util.PrintData(cosmeticResult)
+		utils.PrintData(err)
+		utils.PrintData(cosmeticResult)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -54,8 +54,8 @@ func GetEntries(ctx utils.RouteContext, res http.ResponseWriter, req *http.Reque
 
 	playerResult, err := ctx.Pool.Query(ctx.Context, playerRequest)
 	if err != nil {
-		util.PrintData(err)
-		util.PrintData(playerResult)
+		utils.PrintData(err)
+		utils.PrintData(playerResult)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -77,7 +77,7 @@ func GetEntries(ctx utils.RouteContext, res http.ResponseWriter, req *http.Reque
 
 	tempCache, err := json.Marshal(result)
 	if err != nil {
-		util.PrintData(err)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}

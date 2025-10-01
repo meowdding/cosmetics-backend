@@ -1,4 +1,4 @@
-package util
+package utils
 
 func IsValidResourceLocationNamespace(string string) bool {
 	for _, element := range string {

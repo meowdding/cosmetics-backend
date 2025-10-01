@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"cosmetics/routes/utils"
-	"cosmetics/util"
+	"cosmetics/internal"
+	"cosmetics/utils"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,16 +16,16 @@ const createQuery = `
 	insert into cosmetics(id, version, data) values($1, $2, $3)
 `
 
-func CreateCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func CreateCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	var data = make(map[string]interface{})
 	err := json.NewDecoder(req.Body).Decode(&data)
 	if err != nil {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	util.Log("Trying to create cosmetic: ", data)
+	utils.Log("Trying to create cosmetic: ", data)
 	var key, ok = data["id"].(string)
-	if !ok || !util.IsValidResourceLocationNamespace(key) {
+	if !ok || !utils.IsValidResourceLocationNamespace(key) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -46,18 +46,18 @@ func CreateCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.R
 			case "23505":
 				res.WriteHeader(http.StatusBadRequest)
 			default:
-				util.PrintData(result)
-				util.PrintData(err)
+				utils.PrintData(result)
+				utils.PrintData(err)
 				res.WriteHeader(http.StatusInternalServerError)
 			}
 		} else {
-			util.PrintData(result)
-			util.PrintData(err)
+			utils.PrintData(result)
+			utils.PrintData(err)
 			res.WriteHeader(http.StatusInternalServerError)
 		}
 		return
 	}
-	util.Log("Created cosmetic", "")
+	utils.Log("Created cosmetic", "")
 
 	res.WriteHeader(http.StatusOK)
 }
@@ -66,17 +66,17 @@ const updateQuery = `
 	update cosmetics set version = $2, data = $3 where id = $1
 `
 
-func UpdateCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func UpdateCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	var data = make(map[string]interface{})
 	err := json.NewDecoder(req.Body).Decode(&data)
 	if err != nil {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	util.Log("Trying to update cosmetic: ", data)
+	utils.Log("Trying to update cosmetic: ", data)
 
 	var key, ok = data["id"].(string)
-	if !ok || !util.IsValidResourceLocationNamespace(key) {
+	if !ok || !utils.IsValidResourceLocationNamespace(key) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -91,8 +91,8 @@ func UpdateCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.R
 	jsonData, _ := json.Marshal(data)
 	result, err := ctx.Pool.Exec(ctx.Context, updateQuery, key, version, jsonData)
 	if err != nil {
-		util.PrintData(result)
-		util.PrintData(err)
+		utils.PrintData(result)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -100,7 +100,7 @@ func UpdateCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.R
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
-	util.Log("Updated cosmetic", result.RowsAffected())
+	utils.Log("Updated cosmetic", result.RowsAffected())
 
 	res.WriteHeader(http.StatusOK)
 }
@@ -109,25 +109,25 @@ const deleteQuery = `
 	delete from cosmetics where id = $1
 `
 
-func DeleteCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func DeleteCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	var data = make(map[string]interface{})
 	err := json.NewDecoder(req.Body).Decode(&data)
 	if err != nil {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	util.Log("Deleting cosmetic", data)
+	utils.Log("Deleting cosmetic", data)
 
 	var key, ok = data["id"].(string)
-	if !ok || !util.IsValidResourceLocationNamespace(key) {
+	if !ok || !utils.IsValidResourceLocationNamespace(key) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	result, err := ctx.Pool.Exec(ctx.Context, deleteQuery, key)
 	if err != nil {
-		util.PrintData(result)
-		util.PrintData(err)
+		utils.PrintData(result)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -135,7 +135,7 @@ func DeleteCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.R
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
-	util.Log("Deleted cosmetic", result.RowsAffected())
+	utils.Log("Deleted cosmetic", result.RowsAffected())
 
 	res.WriteHeader(http.StatusOK)
 }
@@ -144,10 +144,10 @@ const getCosmeticIds = `
 	select id from cosmetics
 `
 
-func ListCosmeticIds(ctx utils.RouteContext, res http.ResponseWriter, _ *http.Request) {
+func ListCosmeticIds(ctx internal.RouteContext, res http.ResponseWriter, _ *http.Request) {
 	var cosmetics, err = ctx.Pool.Query(ctx.Context, getCosmeticIds)
 	if err != nil {
-		util.PrintData(err)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -164,7 +164,7 @@ func ListCosmeticIds(ctx utils.RouteContext, res http.ResponseWriter, _ *http.Re
 
 	data, err := json.Marshal(list)
 	if err != nil {
-		util.PrintData(err)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}

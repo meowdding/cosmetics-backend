@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"cosmetics/routes/utils"
-	"cosmetics/util"
+	"cosmetics/internal"
+	"cosmetics/utils"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -21,10 +21,10 @@ const addPlayerCosmetic = `
 	insert into player_cosmetics (player_id, cosmetic_id)  values($1, $2) on conflict do nothing;
 `
 
-func AddPlayerCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func AddPlayerCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	playerId := req.PathValue("uuid")
 	cosmeticId := req.PathValue("cosmetic_id")
-	if !util.IsValidResourceLocationNamespace(cosmeticId) {
+	if !utils.IsValidResourceLocationNamespace(cosmeticId) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -38,13 +38,13 @@ func AddPlayerCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *htt
 			case "23505", "23503":
 				res.WriteHeader(http.StatusBadRequest)
 			default:
-				util.PrintData(result)
-				util.PrintData(err)
+				utils.PrintData(result)
+				utils.PrintData(err)
 				res.WriteHeader(http.StatusInternalServerError)
 			}
 		} else {
-			util.PrintData(result)
-			util.PrintData(err)
+			utils.PrintData(result)
+			utils.PrintData(err)
 			res.WriteHeader(http.StatusInternalServerError)
 		}
 		return
@@ -55,18 +55,18 @@ const removePlayerCosmetic = `
 	delete from player_cosmetics where player_id = $1 and cosmetic_id = $2
 `
 
-func RemovePlayerCosmetic(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func RemovePlayerCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	playerId := req.PathValue("uuid")
 	cosmeticId := req.PathValue("cosmetic_id")
-	if !util.IsValidResourceLocationNamespace(cosmeticId) {
+	if !utils.IsValidResourceLocationNamespace(cosmeticId) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	result, err := ctx.Pool.Exec(ctx.Context, removePlayerCosmetic, playerId, cosmeticId)
 	if err != nil {
-		util.PrintData(result)
-		util.PrintData(err)
+		utils.PrintData(result)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -76,7 +76,7 @@ const setPlayerCustomData = `
 	insert into players (id, data) values ($1, $2) on conflict (id) do update set data = excluded.data;
 `
 
-func UpdatePlayerCustomData(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func UpdatePlayerCustomData(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	playerId := req.PathValue("uuid")
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -87,8 +87,8 @@ func UpdatePlayerCustomData(ctx utils.RouteContext, res http.ResponseWriter, req
 
 	result, err := ctx.Pool.Exec(ctx.Context, setPlayerCustomData, playerId, data)
 	if err != nil {
-		util.PrintData(result)
-		util.PrintData(err)
+		utils.PrintData(result)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -98,12 +98,12 @@ const deletePlayerQuery = `
 	delete from players where id = $1
 `
 
-func DeletePlayer(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func DeletePlayer(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	playerId := req.PathValue("uuid")
 	result, err := ctx.Pool.Exec(ctx.Context, deletePlayerQuery, playerId)
 	if err != nil {
-		util.PrintData(result)
-		util.PrintData(err)
+		utils.PrintData(result)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -113,13 +113,13 @@ const getPlayerQuery = `
 	select player_id, player_data, cosmetics from players_with_cosmetics where player_id = $1 limit 1
 `
 
-func GetPlayerData(ctx utils.RouteContext, res http.ResponseWriter, req *http.Request) {
+func GetPlayerData(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	playerId := req.PathValue("uuid")
 	result, err := ctx.Pool.Query(ctx.Context, getPlayerQuery, playerId)
 
 	if err != nil {
-		util.PrintData(result)
-		util.PrintData(err)
+		utils.PrintData(result)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -130,15 +130,15 @@ func GetPlayerData(ctx utils.RouteContext, res http.ResponseWriter, req *http.Re
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		util.PrintData(result)
-		util.PrintData(err)
+		utils.PrintData(result)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	data, err := json.Marshal(player)
 	if err != nil {
-		util.PrintData(err)
+		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
