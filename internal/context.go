@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/golang-migrate/migrate/v4"
 	migratepgx "github.com/golang-migrate/migrate/v4/database/pgx/v5"
@@ -19,11 +20,24 @@ type RouteContext struct {
 	Context context.Context
 }
 
+func (conf Config) dbUri() string {
+	if conf.DevMode {
+		return conf.PostgresUri
+	} else {
+		user := os.Getenv("POSTGRES_USER")
+		password := os.Getenv("POSTGRES_PASSWORD")
+		host := os.Getenv("POSTGRES_HOST")
+		port := os.Getenv("POSTGRES_PORT")
+		db := os.Getenv("POSTGRES_DB")
+		return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, db)
+	}
+}
+
 func NewRouteContext() RouteContext {
 	config := NewConfig()
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, config.PostgresUri)
+	pool, err := pgxpool.New(ctx, config.dbUri())
 	if err != nil {
 		panic(err)
 	}
@@ -44,10 +58,11 @@ var migrationFS embed.FS
 
 func setupDatabase(ctx *RouteContext) {
 	// Create a dedicated connection for migrations because migrate wont take a pgx conn (needs database/sql conn)
-	migrateConn, err := sql.Open("pgx", ctx.Config.PostgresUri)
+	migrateConn, err := sql.Open("pgx", ctx.Config.dbUri())
 	if err != nil {
 		panic(fmt.Sprintf("failed to acquire connection for migrations: %w", err))
 	}
+	//goland:noinspection GoUnhandledErrorResult
 	defer migrateConn.Close()
 	migrateDriver, err := migratepgx.WithInstance(migrateConn, &migratepgx.Config{
 		MigrationsTable: "cosmetics_migrations",

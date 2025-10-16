@@ -102,12 +102,12 @@ func createSave(path string, handlers RequestRoute) func(http.ResponseWriter, *h
 }
 
 func main() {
-	http.HandleFunc("/cosmetics", create(RequestRoute{
-		Post:   authenticated(routes.CreateCosmetic),
-		Put:    authenticated(routes.UpdateCosmetic),
+	http.HandleFunc("/cosmetics/{cosmetic_id}", create(RequestRoute{
+		Post:   authenticated(routes.CreateOrUpdateCosmetic),
 		Delete: authenticated(routes.DeleteCosmetic),
+		Get:    authenticated(routes.GetCosmetic),
 	}))
-	http.HandleFunc("/cosmetics/ids", create(RequestRoute{
+	http.HandleFunc("/cosmetics", create(RequestRoute{
 		Get: public(routes.ListCosmeticIds),
 	}))
 	http.HandleFunc("/", createSave("/", RequestRoute{

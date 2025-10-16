@@ -13,32 +13,33 @@ import (
 )
 
 const createQuery = `
-	insert into cosmetics(id, version, data) values($1, $2, $3)
+	insert into cosmetics(id, version, data) values($1, $2, $3) on conflict (id) do update set version = $2, data = $3
 `
 
-func CreateCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
+func CreateOrUpdateCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
+	cosmeticId := req.PathValue("cosmetic_id")
 	var data = make(map[string]interface{})
 	err := json.NewDecoder(req.Body).Decode(&data)
 	if err != nil {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	data["id"] = cosmeticId
 	utils.Log("Trying to create cosmetic: ", data)
-	var key, ok = data["id"].(string)
-	if !ok || !utils.IsValidResourceLocationNamespace(key) {
+	if cosmeticId == "" || !utils.IsValidResourceLocationNamespace(cosmeticId) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	var version = data["version"]
-	_, ok = version.(float64)
+	_, ok := version.(float64)
 	if version == nil || !ok {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	jsonData, _ := json.Marshal(data)
-	result, err := ctx.Pool.Exec(ctx.Context, createQuery, key, version, jsonData)
+	result, err := ctx.Pool.Exec(ctx.Context, createQuery, cosmeticId, version, jsonData)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -62,47 +63,31 @@ func CreateCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *htt
 	res.WriteHeader(http.StatusOK)
 }
 
-const updateQuery = `
-	update cosmetics set version = $2, data = $3 where id = $1
+const getQuery = `
+	select data from cosmetics where id = $1
 `
 
-func UpdateCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
-	var data = make(map[string]interface{})
-	err := json.NewDecoder(req.Body).Decode(&data)
-	if err != nil {
-		res.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	utils.Log("Trying to update cosmetic: ", data)
-
-	var key, ok = data["id"].(string)
-	if !ok || !utils.IsValidResourceLocationNamespace(key) {
+func GetCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
+	cosmeticId := req.PathValue("cosmetic_id")
+	if !utils.IsValidResourceLocationNamespace(cosmeticId) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	var version = data["version"]
-	_, ok = version.(float64)
-	if version == nil || !ok {
-		res.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	jsonData, _ := json.Marshal(data)
-	result, err := ctx.Pool.Exec(ctx.Context, updateQuery, key, version, jsonData)
+	result, err := ctx.Pool.Query(ctx.Context, getQuery, cosmeticId)
 	if err != nil {
 		utils.PrintData(result)
 		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if result.RowsAffected() != 1 {
+	if !result.Next() {
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
-	utils.Log("Updated cosmetic", result.RowsAffected())
 
-	res.WriteHeader(http.StatusOK)
+	res.Header().Set("Content-Type", "application/json")
+	_, _ = res.Write(result.RawValues()[0])
 }
 
 const deleteQuery = `
@@ -110,21 +95,13 @@ const deleteQuery = `
 `
 
 func DeleteCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
-	var data = make(map[string]interface{})
-	err := json.NewDecoder(req.Body).Decode(&data)
-	if err != nil {
-		res.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	utils.Log("Deleting cosmetic", data)
-
-	var key, ok = data["id"].(string)
-	if !ok || !utils.IsValidResourceLocationNamespace(key) {
+	cosmeticId := req.PathValue("cosmetic_id")
+	if !utils.IsValidResourceLocationNamespace(cosmeticId) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	result, err := ctx.Pool.Exec(ctx.Context, deleteQuery, key)
+	result, err := ctx.Pool.Exec(ctx.Context, deleteQuery, cosmeticId)
 	if err != nil {
 		utils.PrintData(result)
 		utils.PrintData(err)

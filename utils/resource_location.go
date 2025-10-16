@@ -1,6 +1,10 @@
 package utils
 
 func IsValidResourceLocationNamespace(string string) bool {
+	if len(string) < 1 {
+		return false
+	}
+
 	for _, element := range string {
 		if !isValidNamespaceChar(element) {
 			return false

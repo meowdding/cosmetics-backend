@@ -23,9 +23,9 @@ create table if not exists player_cosmetics
 );
 
 create view players_with_cosmetics as
-select players.id                                         as player_id,
-       players.data                                       as player_data,
-       coalesce(array_agg(cosmetics.id), '{}'::varchar[]) as cosmetics
+select players.id                                                                 as player_id,
+       players.data                                                               as player_data,
+       array_remove(coalesce(array_agg(cosmetics.id), array []::varchar[]), null) as cosmetics
 from players
          left join player_cosmetics on players.id = player_cosmetics.player_id
          left join cosmetics on cosmetics.id = player_cosmetics.cosmetic_id

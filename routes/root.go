@@ -34,7 +34,7 @@ type Response struct {
 var cache = ""
 var lastCreated time.Time
 
-func GetEntries(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
+func GetEntries(ctx internal.RouteContext, res http.ResponseWriter, _ *http.Request) {
 	if len(cache) != 0 && time.Now().Sub(lastCreated) < time.Second*5 {
 		res.Header().Set("Content-Type", "application/json")
 		res.Header().Set("Cache-Control", "max-age=300")
@@ -69,6 +69,9 @@ func GetEntries(ctx internal.RouteContext, res http.ResponseWriter, req *http.Re
 			continue
 		}
 		result.Cosmetics = append(result.Cosmetics, cosmetic)
+	}
+	if result.Cosmetics == nil {
+		result.Cosmetics = make([]interface{}, 0)
 	}
 
 	list, err := pgx.CollectRows(playerResult, pgx.RowToStructByPos[PlayerType])
