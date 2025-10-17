@@ -4,12 +4,9 @@ import (
 	"cosmetics/internal"
 	"cosmetics/utils"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const createQuery = `
@@ -25,9 +22,17 @@ func CreateOrUpdateCosmetic(ctx internal.RouteContext, res http.ResponseWriter, 
 		return
 	}
 	data["id"] = cosmeticId
-	utils.Log("Trying to create cosmetic: ", data)
+	utils.LogData{
+		Message: "Trying to create cosmetic",
+		Data:    data,
+	}.Log()
 	if cosmeticId == "" || !utils.IsValidResourceLocationNamespace(cosmeticId) {
 		res.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(res, "Invalid cosmetic Id")
+		utils.LogData{
+			Message: "Invalid create cosmetic request, invalid cosmetic id",
+			Data:    cosmeticId,
+		}.Log()
 		return
 	}
 
@@ -35,30 +40,28 @@ func CreateOrUpdateCosmetic(ctx internal.RouteContext, res http.ResponseWriter, 
 	_, ok := version.(float64)
 	if version == nil || !ok {
 		res.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(res, "No version field")
+		utils.LogData{
+			Message: "Invalid create cosmetic request, no version field",
+			Data:    cosmeticId,
+		}.Log()
 		return
 	}
 
 	jsonData, _ := json.Marshal(data)
-	result, err := ctx.Pool.Exec(ctx.Context, createQuery, cosmeticId, version, jsonData)
+	_, err = ctx.Pool.Exec(ctx.Context, createQuery, cosmeticId, version, jsonData)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case "23505":
-				res.WriteHeader(http.StatusBadRequest)
-			default:
-				utils.PrintData(result)
-				utils.PrintData(err)
-				res.WriteHeader(http.StatusInternalServerError)
-			}
-		} else {
-			utils.PrintData(result)
-			utils.PrintData(err)
-			res.WriteHeader(http.StatusInternalServerError)
-		}
+		res.WriteHeader(http.StatusInternalServerError)
+		utils.LogData{
+			Message: "Failed to create cosmetic",
+			Data:    err,
+		}.Log()
 		return
 	}
-	utils.Log("Created cosmetic", "")
+	utils.LogData{
+		Message: "Created cosmetic",
+		Data:    cosmeticId,
+	}.Log()
 
 	res.WriteHeader(http.StatusOK)
 }
@@ -96,6 +99,10 @@ const deleteQuery = `
 
 func DeleteCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	cosmeticId := req.PathValue("cosmetic_id")
+	utils.LogData{
+		Message: "Trying to delete cosmetic",
+		Data:    cosmeticId,
+	}.Log()
 	if !utils.IsValidResourceLocationNamespace(cosmeticId) {
 		res.WriteHeader(http.StatusBadRequest)
 		return
@@ -103,17 +110,26 @@ func DeleteCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *htt
 
 	result, err := ctx.Pool.Exec(ctx.Context, deleteQuery, cosmeticId)
 	if err != nil {
-		utils.PrintData(result)
-		utils.PrintData(err)
+		utils.LogData{
+			Message: "Failed to delete cosmetic",
+			Data:    err,
+		}.Log()
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if result.RowsAffected() != 1 {
 		res.WriteHeader(http.StatusNotFound)
+		utils.LogData{
+			Message: "Failed to delete cosmetic, no matching found",
+			Data:    cosmeticId,
+		}.Log()
 		return
 	}
-	utils.Log("Deleted cosmetic", result.RowsAffected())
 
+	utils.LogData{
+		Message: "Deleted cosmetic",
+		Data:    cosmeticId,
+	}.Log()
 	res.WriteHeader(http.StatusOK)
 }
 

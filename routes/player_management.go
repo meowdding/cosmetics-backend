@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -24,7 +25,21 @@ const addPlayerCosmetic = `
 func AddPlayerCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	playerId := req.PathValue("uuid")
 	cosmeticId := req.PathValue("cosmetic_id")
+	utils.LogData{
+		Message: "Trying to add cosmetic to player!",
+		Data: struct {
+			Player   string
+			Cosmetic string
+		}{playerId, cosmeticId},
+	}.Log()
 	if !utils.IsValidResourceLocationNamespace(cosmeticId) {
+		utils.LogData{
+			Message: "Failed to add cosmetic, invalid cosmetic id!",
+			Data: struct {
+				Player   string
+				Cosmetic string
+			}{playerId, cosmeticId},
+		}.Log()
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -35,7 +50,10 @@ func AddPlayerCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			switch pgErr.Code {
-			case "23505", "23503":
+			case "23503":
+				res.WriteHeader(http.StatusBadRequest)
+				_, _ = io.WriteString(res, "No matching cosmetic found!")
+			case "23505":
 				res.WriteHeader(http.StatusBadRequest)
 			default:
 				utils.PrintData(result)
@@ -47,8 +65,31 @@ func AddPlayerCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *
 			utils.PrintData(err)
 			res.WriteHeader(http.StatusInternalServerError)
 		}
+		utils.LogData{
+			Message: "Failed to add player cosmetic!",
+			Data:    err,
+		}.Log()
 		return
 	}
+	if result.RowsAffected() != 1 {
+		res.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(res, "Already present!")
+		utils.LogData{
+			Message: "Failed to add cosmetic to player, no matching found!",
+			Data: struct {
+				Player   string
+				Cosmetic string
+			}{playerId, cosmeticId},
+		}.Log()
+		return
+	}
+	utils.LogData{
+		Message: "Added cosmetic to player!",
+		Data: struct {
+			Player   string
+			Cosmetic string
+		}{playerId, cosmeticId},
+	}.Log()
 }
 
 const removePlayerCosmetic = `
@@ -58,7 +99,21 @@ const removePlayerCosmetic = `
 func RemovePlayerCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	playerId := req.PathValue("uuid")
 	cosmeticId := req.PathValue("cosmetic_id")
+	utils.LogData{
+		Message: "Trying to remove cosmetic from player!",
+		Data: struct {
+			Player   string
+			Cosmetic string
+		}{playerId, cosmeticId},
+	}.Log()
 	if !utils.IsValidResourceLocationNamespace(cosmeticId) {
+		utils.LogData{
+			Message: "Failed to remove cosmetic from player, invalid id!",
+			Data: struct {
+				Player   string
+				Cosmetic string
+			}{playerId, cosmeticId},
+		}.Log()
 		res.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -67,7 +122,23 @@ func RemovePlayerCosmetic(ctx internal.RouteContext, res http.ResponseWriter, re
 	if err != nil {
 		utils.PrintData(result)
 		utils.PrintData(err)
+		utils.LogData{
+			Message: "Failed to remove cosmetic from player!",
+			Data:    err,
+		}.Log()
 		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if result.RowsAffected() != 1 {
+		utils.LogData{
+			Message: "Failed to remove cosmetic from player, no matching found!",
+			Data: struct {
+				Player   string
+				Cosmetic string
+			}{playerId, cosmeticId},
+		}.Log()
+		res.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(res, "No matching pair found!")
 		return
 	}
 }
@@ -84,14 +155,59 @@ func UpdatePlayerCustomData(ctx internal.RouteContext, res http.ResponseWriter, 
 		return
 	}
 	data := string(body)
+	if !utils.IsJson(data) {
+		utils.LogData{
+			Message: "Failed Updating player, invalid json!",
+			Data: struct {
+				Player string
+				Data   string
+			}{playerId, string(body)},
+		}.Log()
+		res.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(res, "Invalid json!")
+		return
+	}
 
-	result, err := ctx.Pool.Exec(ctx.Context, setPlayerCustomData, playerId, data)
+	utils.LogData{
+		Message: "Update custom data for player",
+		Data: struct {
+			Player string
+			Data   string
+		}{playerId, data},
+	}.Log()
+
+	_, err = ctx.Pool.Exec(ctx.Context, setPlayerCustomData, playerId, data)
 	if err != nil {
-		utils.PrintData(result)
-		utils.PrintData(err)
+		utils.LogData{
+			Message: "Failed to update custom player data",
+			Data: struct {
+				Error error
+				Data  string
+			}{err, data},
+		}.Log()
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+const getPlayerCustomData = `
+	select data from players where id = $1
+`
+
+func GetPlayerCustomData(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
+	playerId := req.PathValue("uuid")
+	result, err := ctx.Pool.Query(ctx.Context, getPlayerCustomData, playerId)
+	if err != nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if !result.Next() {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	_, _ = res.Write(result.RawValues()[0])
 }
 
 const deletePlayerQuery = `
@@ -100,12 +216,26 @@ const deletePlayerQuery = `
 
 func DeletePlayer(ctx internal.RouteContext, res http.ResponseWriter, req *http.Request) {
 	playerId := req.PathValue("uuid")
+
+	utils.LogData{
+		Message: "Trying to delete player",
+		Data:    playerId,
+	}.Log()
 	result, err := ctx.Pool.Exec(ctx.Context, deletePlayerQuery, playerId)
 	if err != nil {
-		utils.PrintData(result)
-		utils.PrintData(err)
+		utils.LogData{
+			Message: "Failed to delete player!",
+			Data:    err,
+		}.Log()
 		res.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+	if result.RowsAffected() != 1 {
+		utils.LogData{
+			Message: "Failed to delete player, no matching found!",
+			Data:    playerId,
+		}.Log()
+		res.WriteHeader(http.StatusNotFound)
 	}
 }
 
@@ -137,6 +267,41 @@ func GetPlayerData(ctx internal.RouteContext, res http.ResponseWriter, req *http
 	}
 
 	data, err := json.Marshal(player)
+	if err != nil {
+		utils.PrintData(err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	_, _ = io.WriteString(res, string(data))
+}
+
+const getPlayerIds = `
+	select id from players
+`
+
+func ListPlayerIds(ctx internal.RouteContext, res http.ResponseWriter, _ *http.Request) {
+	var players, err = ctx.Pool.Query(ctx.Context, getPlayerIds)
+	if err != nil {
+		utils.PrintData(err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var list = make([]string, 0)
+	for players.Next() {
+		id, err := uuid.FromBytes(players.RawValues()[0])
+		if err != nil {
+			utils.LogData{
+				Message: "Failed to create uuid",
+				Data:    err,
+			}.Log()
+			continue
+		}
+		list = append(list, id.String())
+	}
+
+	data, err := json.Marshal(list)
 	if err != nil {
 		utils.PrintData(err)
 		res.WriteHeader(http.StatusInternalServerError)

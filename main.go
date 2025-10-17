@@ -113,12 +113,16 @@ func main() {
 	http.HandleFunc("/", createSave("/", RequestRoute{
 		Get: public(routes.GetEntries),
 	}))
+	http.HandleFunc("/players", create(RequestRoute{
+		Get: public(routes.ListPlayerIds),
+	}))
 	http.HandleFunc("/players/{uuid}", create(RequestRoute{
 		Get:    public(routes.GetPlayerData),
 		Delete: authenticated(routes.DeletePlayer),
 	}))
 	http.HandleFunc("/players/{uuid}/data", create(RequestRoute{
-		Post: public(routes.UpdatePlayerCustomData),
+		Post: authenticated(routes.UpdatePlayerCustomData),
+		Get:  public(routes.GetPlayerCustomData),
 	}))
 	http.HandleFunc("/players/{uuid}/cosmetics/{cosmetic_id}", create(RequestRoute{
 		Post:   public(routes.AddPlayerCosmetic),
