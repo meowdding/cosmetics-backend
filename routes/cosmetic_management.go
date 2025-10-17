@@ -84,6 +84,7 @@ func GetCosmetic(ctx internal.RouteContext, res http.ResponseWriter, req *http.R
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	defer result.Close()
 	if !result.Next() {
 		res.WriteHeader(http.StatusNotFound)
 		return

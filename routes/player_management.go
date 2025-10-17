@@ -201,6 +201,7 @@ func GetPlayerCustomData(ctx internal.RouteContext, res http.ResponseWriter, req
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	defer result.Close()
 	if !result.Next() {
 		res.WriteHeader(http.StatusNotFound)
 		return
@@ -254,6 +255,7 @@ func GetPlayerData(ctx internal.RouteContext, res http.ResponseWriter, req *http
 		return
 	}
 
+	defer result.Close()
 	player, err := pgx.CollectOneRow(result, pgx.RowToStructByPos[PlayerType])
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -287,6 +289,7 @@ func ListPlayerIds(ctx internal.RouteContext, res http.ResponseWriter, _ *http.R
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	defer players.Close()
 
 	var list = make([]string, 0)
 	for players.Next() {
