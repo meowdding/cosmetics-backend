@@ -176,6 +176,7 @@ func UpdatePlayerCustomData(ctx internal.RouteContext, res http.ResponseWriter, 
 		}{playerId, data},
 	}.Log()
 
+	_, _ = ctx.Pool.Exec(ctx.Context, createPlayer, playerId)
 	_, err = ctx.Pool.Exec(ctx.Context, setPlayerCustomData, playerId, data)
 	if err != nil {
 		utils.LogData{
@@ -203,7 +204,7 @@ func GetPlayerCustomData(ctx internal.RouteContext, res http.ResponseWriter, req
 	}
 	defer result.Close()
 	if !result.Next() {
-		res.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(res, "{}")
 		return
 	}
 
